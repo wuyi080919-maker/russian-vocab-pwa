@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#f4f1ea"/>
+  <path d="M88 144c0-38.7 31.3-70 70-70h196c38.7 0 70 31.3 70 70v224c0 38.7-31.3 70-70 70H158c-38.7 0-70-31.3-70-70V144z" fill="#fdfbf6" stroke="#1a1814" stroke-width="18"/>
+  <path d="M150 174h212M150 256h212M150 338h128" fill="none" stroke="#8b3a3a" stroke-width="24" stroke-linecap="round"/>
+  <text x="256" y="315" text-anchor="middle" font-family="Georgia, serif" font-size="158" font-weight="700" fill="#1a1814">Я</text>
+</svg>

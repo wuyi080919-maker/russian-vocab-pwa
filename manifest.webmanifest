@@ -1,0 +1,26 @@
+{
+  "name": "俄语背单词 · Русский",
+  "short_name": "Русский",
+  "description": "俄语背单词 PWA：单词卡、拼写、填空、发音、错词和进度统计。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f1ea",
+  "theme_color": "#f4f1ea",
+  "icons": [
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Русский">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f4f1ea">
+<meta name="description" content="俄语背单词 PWA：单词卡、拼写、填空、发音、错词和进度统计。">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-512.png">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>俄语背单词 · Русский</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --bg-card: #fdfbf6;
+    --bg-soft: #ebe6dc;
+    --ink: #1a1814;
+    --ink-soft: #5c574e;
+    --ink-faint: #8a8478;
+    --accent: #8b3a3a;
+    --accent-soft: #f2e0d5;
+    --ok: #4a6b3e;
+    --ok-soft: #dde6d4;
+    --err: #b34747;
+    --err-soft: #f5dcdc;
+    --hint: #4a6b8a;
+    --hint-soft: #dce5ef;
+    --border: rgba(26, 24, 20, 0.12);
+    --border-strong: rgba(26, 24, 20, 0.25);
+    --serif: 'Cormorant Garamond', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+    --sans: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --cyr: 'Cormorant Garamond', 'PT Serif', Georgia, serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  body { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); }
+  button, input { font-family: inherit; font-size: inherit; color: inherit; }
+  button { cursor: pointer; border: none; background: none; padding: 0; }
+  input { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; width: 100%; outline: none; transition: border-color .15s; }
+  input:focus { border-color: var(--ink-soft); }
+
+  .app { max-width: 480px; margin: 0 auto; padding: 16px 14px 100px; min-height: 100vh; }
+  .header { display: flex; align-items: baseline; gap: 10px; padding: 6px 0 18px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .header h1 { font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: 0.02em; margin: 0; }
+  .header .sub { font-size: 11px; color: var(--ink-faint); letter-spacing: 0.15em; text-transform: uppercase; font-weight: 500; }
+
+  .mode-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .mode-tabs::-webkit-scrollbar { display: none; }
+  .tab { flex-shrink: 0; padding: 7px 12px; font-size: 12px; font-weight: 500; color: var(--ink-soft); border-radius: 14px; border: 1px solid transparent; white-space: nowrap; transition: all .15s; }
+  .tab.active { background: var(--ink); color: var(--bg-card); }
+  .tab:not(.active):hover { background: var(--bg-soft); }
+
+  .topic-row { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .topic-row::-webkit-scrollbar { display: none; }
+  .chip { flex-shrink: 0; padding: 4px 10px; font-size: 11px; color: var(--ink-soft); border: 1px solid var(--border); border-radius: 10px; background: var(--bg-card); white-space: nowrap; }
+  .chip.active { background: var(--ink); color: var(--bg-card); border-color: var(--ink); }
+
+  .progress { height: 2px; background: var(--bg-soft); border-radius: 1px; overflow: hidden; margin-bottom: 14px; }
+  .progress-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 16px; box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+
+  .badge { display: inline-block; padding: 2px 8px; font-size: 10px; background: var(--bg-soft); color: var(--ink-soft); border-radius: 10px; letter-spacing: 0.05em; }
+  .badge.custom { background: var(--hint-soft); color: var(--hint); }
+
+  .ru-big { font-family: var(--cyr); font-size: 34px; font-weight: 500; letter-spacing: 0.01em; line-height: 1.15; }
+  .ru-mid { font-family: var(--cyr); font-size: 22px; font-weight: 500; }
+  .pos { font-size: 11px; color: var(--ink-faint); font-style: italic; }
+  .cn { font-size: 17px; }
+
+  .icon-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; font-size: 11px; color: var(--ink-soft); background: var(--bg-soft); border-radius: 6px; transition: background .12s; }
+  .icon-btn:hover { background: var(--border); }
+  .icon-btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+  .example { background: var(--bg-soft); border-radius: 8px; padding: 11px 12px; margin: 12px 0 10px; }
+  .example .ru-ex { font-family: var(--cyr); font-size: 15px; margin: 0 0 4px; }
+  .example .cn-ex { font-size: 12px; color: var(--ink-soft); margin: 0; }
+
+  .note { background: var(--hint-soft); color: var(--hint); border-radius: 8px; padding: 8px 11px; font-size: 12px; line-height: 1.5; }
+
+  .nav-row { display: flex; gap: 6px; margin-top: 10px; }
+  .nav-btn { flex: 1; padding: 11px; font-size: 13px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--ink); font-weight: 500; transition: all .12s; }
+  .nav-btn:hover { background: var(--bg-soft); }
+  .nav-btn.primary { flex: 2; }
+  .nav-btn.success { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+  .nav-btn.danger { background: var(--err-soft); color: var(--err); border-color: transparent; }
+  .nav-btn.accent { background: var(--accent); color: var(--bg-card); border-color: transparent; }
+
+  .flashcard { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; user-select: none; }
+
+  .opt { display: block; width: 100%; text-align: left; padding: 11px 13px; font-size: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; transition: all .12s; }
+  .opt:hover:not(:disabled) { border-color: var(--ink-soft); background: var(--bg-soft); }
+  .opt.correct { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+  .opt.wrong { background: var(--err-soft); border-color: var(--err); color: var(--err); }
+  .opt:disabled { cursor: default; }
+
+  .input-display { min-height: 48px; padding: 10px 14px; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: 8px; font-family: var(--cyr); font-size: 22px; letter-spacing: 1px; margin: 8px 0 10px; word-break: break-word; }
+  .input-display.ok { border-color: var(--ok); color: var(--ok); }
+  .input-display.err { border-color: var(--err); color: var(--err); }
+  .input-display.empty { color: var(--ink-faint); font-family: var(--sans); font-size: 13px; letter-spacing: 0; }
+
+  .kbd { margin: 10px 0; }
+  .kbd-row { display: flex; gap: 3px; justify-content: center; margin-bottom: 3px; }
+  .kbd-key { flex: 1; max-width: 34px; min-width: 0; padding: 10px 0; font-family: var(--cyr); font-size: 15px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; transition: background .08s; }
+  .kbd-key:active { background: var(--accent-soft); }
+  .kbd-fn { padding: 8px 0; font-size: 11px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 5px; }
+  .kbd-fn.active { background: var(--accent); color: var(--bg-card); }
+
+  .feedback { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .feedback.ok { background: var(--ok-soft); color: var(--ok); }
+  .feedback.err { background: var(--err-soft); color: var(--err); }
+  .feedback strong { font-family: var(--cyr); font-size: 16px; font-weight: 500; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .stat-label { font-size: 10px; color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase; margin: 0 0 4px; }
+  .stat-value { font-family: var(--serif); font-size: 28px; font-weight: 500; margin: 0; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--ink-soft); }
+
+  .topic-bar { margin-bottom: 7px; }
+  .topic-bar .lbl { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; color: var(--ink-soft); }
+  .bar-bg { height: 4px; background: var(--bg-soft); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); }
+
+  .form-label { font-size: 11px; color: var(--ink-soft); display: block; margin-bottom: 3px; letter-spacing: 0.03em; }
+  .form-row { margin-bottom: 9px; }
+
+  .list-item { display: flex; align-items: center; gap: 8px; padding: 9px 10px; background: var(--bg-soft); border-radius: 7px; margin-bottom: 5px; }
+  .list-item .info { flex: 1; min-width: 0; }
+  .list-item .info p { margin: 0; }
+  .list-item .ru { font-family: var(--cyr); font-size: 14px; font-weight: 500; }
+  .list-item .cn-small { font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .small-btn { padding: 5px 8px; font-size: 11px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 5px; flex-shrink: 0; }
+  .small-btn.danger { color: var(--err); }
+
+  .footer-stats { display: flex; justify-content: space-between; padding-top: 12px; margin-top: 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--ink-faint); letter-spacing: 0.05em; }
+
+  .empty { text-align: center; padding: 40px 20px; color: var(--ink-soft); font-size: 14px; }
+
+  @media (max-width: 380px) {
+    .kbd-key { max-width: 28px; font-size: 13px; padding: 9px 0; }
+    .ru-big { font-size: 28px; }
+    .header h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Русский</h1>
+    <span class="sub">俄语 · 背单词</span>
+  </div>
+
+  <div class="mode-tabs" id="modeTabs"></div>
+  <div class="topic-row" id="topicRow"></div>
+  <div class="progress" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div id="content"></div>
+
+  <div class="footer-stats">
+    <span id="wordCounter">0 / 0</span>
+    <span>已掌握 <span id="knownCounter">0</span></span>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ============ 词库 ============
+const BUILTIN = [
+  { id: 'b1', topic: '问候', ru: 'привет', stress: 'приве́т', pos: '感叹词', cn: '你好', example: 'Привет, как дела?', exampleCn: '你好，最近怎么样？', target: 'Привет', note: '朋友、同龄人之间用' },
+  { id: 'b2', topic: '问候', ru: 'здравствуйте', stress: 'здра́вствуйте', pos: '感叹词', cn: '您好', example: 'Здравствуйте, я Анна.', exampleCn: '您好，我是安娜。', target: 'Здравствуйте', note: '正式场合' },
+  { id: 'b3', topic: '问候', ru: 'спасибо', stress: 'спаси́бо', pos: '感叹词', cn: '谢谢', example: 'Большое спасибо!', exampleCn: '非常感谢！', target: 'спасибо', note: '万能感谢' },
+  { id: 'b4', topic: '问候', ru: 'пожалуйста', stress: 'пожа́луйста', pos: '感叹词', cn: '请；不客气', example: 'Спасибо! — Пожалуйста.', exampleCn: '谢谢！—— 不客气。', target: 'Пожалуйста', note: '双重含义' },
+  { id: 'b5', topic: '问候', ru: 'до свидания', stress: 'до свида́ния', pos: '感叹词', cn: '再见', example: 'До свидания, до завтра.', exampleCn: '再见，明天见。', target: 'свидания', note: '正式告别' },
+  { id: 'b6', topic: '问候', ru: 'извините', stress: 'извини́те', pos: '感叹词', cn: '对不起；请问', example: 'Извините, где метро?', exampleCn: '请问地铁在哪？', target: 'Извините', note: '搭讪/道歉都用' },
+
+  { id: 'b7', topic: '家人', ru: 'мама', stress: 'ма́ма', pos: '阴性名词', cn: '妈妈', example: 'Моя мама врач.', exampleCn: '我妈妈是医生。', target: 'мама', note: '口语' },
+  { id: 'b8', topic: '家人', ru: 'папа', stress: 'па́па', pos: '阳性名词', cn: '爸爸', example: 'Папа работает дома.', exampleCn: '爸爸在家工作。', target: 'Папа', note: '虽然以 а 结尾但是阳性' },
+  { id: 'b9', topic: '家人', ru: 'сын', stress: 'сы́н', pos: '阳性名词', cn: '儿子', example: 'У меня один сын.', exampleCn: '我有一个儿子。', target: 'сын', note: '复数：сыновья' },
+  { id: 'b10', topic: '家人', ru: 'дочь', stress: 'до́чь', pos: '阴性名词', cn: '女儿', example: 'Это моя дочь.', exampleCn: '这是我女儿。', target: 'дочь', note: '软变化名词' },
+  { id: 'b11', topic: '家人', ru: 'брат', stress: 'бра́т', pos: '阳性名词', cn: '哥哥/弟弟', example: 'Мой брат студент.', exampleCn: '我哥/弟是大学生。', target: 'брат', note: '复数：братья' },
+  { id: 'b12', topic: '家人', ru: 'сестра', stress: 'сестра́', pos: '阴性名词', cn: '姐姐/妹妹', example: 'Моя сестра врач.', exampleCn: '我姐/妹是医生。', target: 'сестра', note: '复数：сёстры' },
+
+  { id: 'b13', topic: '数字', ru: 'один', stress: 'оди́н', pos: '数词', cn: '一', example: 'У меня один билет.', exampleCn: '我有一张票。', target: 'один', note: '后接阳性单数主格' },
+  { id: 'b14', topic: '数字', ru: 'два', stress: 'два́', pos: '数词', cn: '二', example: 'Два кофе, пожалуйста.', exampleCn: '请来两杯咖啡。', target: 'Два', note: '后接单数二格' },
+  { id: 'b15', topic: '数字', ru: 'три', stress: 'три́', pos: '数词', cn: '三', example: 'У меня три брата.', exampleCn: '我有三个兄弟。', target: 'три', note: '后接单数二格' },
+  { id: 'b16', topic: '数字', ru: 'четыре', stress: 'четы́ре', pos: '数词', cn: '四', example: 'Четыре часа.', exampleCn: '四点钟。', target: 'Четыре', note: '后接单数二格' },
+  { id: 'b17', topic: '数字', ru: 'пять', stress: 'пя́ть', pos: '数词', cn: '五', example: 'Пять минут.', exampleCn: '五分钟。', target: 'Пять', note: '后接复数二格' },
+  { id: 'b18', topic: '数字', ru: 'десять', stress: 'де́сять', pos: '数词', cn: '十', example: 'Десять рублей.', exampleCn: '十卢布。', target: 'Десять', note: '后接复数二格' },
+
+  { id: 'b19', topic: '食物', ru: 'вода', stress: 'вода́', pos: '阴性名词', cn: '水', example: 'Я пью воду.', exampleCn: '我在喝水。', target: 'воду', note: '宾格 воду（重音前移）' },
+  { id: 'b20', topic: '食物', ru: 'хлеб', stress: 'хле́б', pos: '阳性名词', cn: '面包', example: 'Я ем хлеб.', exampleCn: '我在吃面包。', target: 'хлеб', note: '不可数' },
+  { id: 'b21', topic: '食物', ru: 'кофе', stress: 'ко́фе', pos: '阳性名词', cn: '咖啡', example: 'Я люблю кофе.', exampleCn: '我喜欢咖啡。', target: 'кофе', note: '不变格' },
+  { id: 'b22', topic: '食物', ru: 'чай', stress: 'ча́й', pos: '阳性名词', cn: '茶', example: 'Хочешь чай?', exampleCn: '你想喝茶吗？', target: 'чай', note: '日常饮品' },
+  { id: 'b23', topic: '食物', ru: 'молоко', stress: 'молоко́', pos: '中性名词', cn: '牛奶', example: 'Дайте молоко.', exampleCn: '请给我牛奶。', target: 'молоко', note: '不可数' },
+  { id: 'b24', topic: '食物', ru: 'яблоко', stress: 'я́блоко', pos: '中性名词', cn: '苹果', example: 'Это вкусное яблоко.', exampleCn: '这是个好吃的苹果。', target: 'яблоко', note: '复数：яблоки' },
+  { id: 'b25', topic: '食物', ru: 'рис', stress: 'ри́с', pos: '阳性名词', cn: '米饭', example: 'Я ем рис.', exampleCn: '我吃米饭。', target: 'рис', note: '不可数' },
+
+  { id: 'b26', topic: '动词', ru: 'читать', stress: 'чита́ть', pos: '动词（未完成体）', cn: '读', example: 'Я читаю книгу.', exampleCn: '我在读书。', target: 'читаю', note: '我 читаю / 你 читаешь' },
+  { id: 'b27', topic: '动词', ru: 'писать', stress: 'писа́ть', pos: '动词（未完成体）', cn: '写', example: 'Я пишу письмо.', exampleCn: '我在写信。', target: 'пишу', note: '我 пишу / 你 пишешь（重音移）' },
+  { id: 'b28', topic: '动词', ru: 'говорить', stress: 'говори́ть', pos: '动词（未完成体）', cn: '说', example: 'Я говорю по-русски.', exampleCn: '我说俄语。', target: 'говорю', note: '我 говорю / 你 говоришь' },
+  { id: 'b29', topic: '动词', ru: 'есть', stress: 'е́сть', pos: '动词', cn: '吃；有', example: 'Я ем хлеб.', exampleCn: '我在吃面包。', target: 'ем', note: '不规则：ем / ешь / ест' },
+  { id: 'b30', topic: '动词', ru: 'пить', stress: 'пи́ть', pos: '动词（未完成体）', cn: '喝', example: 'Я пью воду.', exampleCn: '我在喝水。', target: 'пью', note: '我 пью / 你 пьёшь' },
+  { id: 'b31', topic: '动词', ru: 'идти', stress: 'идти́', pos: '动词（未完成体）', cn: '走，去（定向）', example: 'Я иду домой.', exampleCn: '我正在回家。', target: 'иду', note: '我 иду / 你 идёшь' },
+  { id: 'b32', topic: '动词', ru: 'работать', stress: 'рабо́тать', pos: '动词（未完成体）', cn: '工作', example: 'Я работаю в офисе.', exampleCn: '我在办公室工作。', target: 'работаю', note: '规则变位' },
+  { id: 'b33', topic: '动词', ru: 'жить', stress: 'жи́ть', pos: '动词（未完成体）', cn: '住，活', example: 'Я живу в Москве.', exampleCn: '我住在莫斯科。', target: 'живу', note: '我 живу / 你 живёшь' },
+  { id: 'b34', topic: '动词', ru: 'любить', stress: 'люби́ть', pos: '动词（未完成体）', cn: '爱，喜欢', example: 'Я люблю тебя.', exampleCn: '我爱你。', target: 'люблю', note: '我 люблю（加 л）' },
+  { id: 'b35', topic: '动词', ru: 'знать', stress: 'зна́ть', pos: '动词（未完成体）', cn: '知道', example: 'Я знаю русский.', exampleCn: '我懂俄语。', target: 'знаю', note: '规则变位' },
+
+  { id: 'b36', topic: '地点', ru: 'дом', stress: 'до́м', pos: '阳性名词', cn: '房子；家', example: 'Это мой дом.', exampleCn: '这是我家。', target: 'дом', note: '在家：дома（副词）' },
+  { id: 'b37', topic: '地点', ru: 'школа', stress: 'шко́ла', pos: '阴性名词', cn: '学校', example: 'Дети идут в школу.', exampleCn: '孩子们去上学。', target: 'школу', note: '宾格 школу' },
+  { id: 'b38', topic: '地点', ru: 'работа', stress: 'рабо́та', pos: '阴性名词', cn: '工作；单位', example: 'Я еду на работу.', exampleCn: '我去上班。', target: 'работу', note: '搭配 на работе / на работу' },
+  { id: 'b39', topic: '地点', ru: 'магазин', stress: 'магази́н', pos: '阳性名词', cn: '商店', example: 'Я иду в магазин.', exampleCn: '我去商店。', target: 'магазин', note: '搭配 в магазин / в магазине' },
+  { id: 'b40', topic: '地点', ru: 'город', stress: 'го́род', pos: '阳性名词', cn: '城市', example: 'Москва — большой город.', exampleCn: '莫斯科是大城市。', target: 'город', note: '复数：города' },
+  { id: 'b41', topic: '地点', ru: 'улица', stress: 'у́лица', pos: '阴性名词', cn: '街道', example: 'Это красивая улица.', exampleCn: '这是条美丽的街。', target: 'улица', note: '在街上：на улице' },
+
+  { id: 'b42', topic: '常用', ru: 'хороший', stress: 'хоро́ший', pos: '形容词', cn: '好的', example: 'Это хороший день.', exampleCn: '这是个好日子。', target: 'хороший', note: '阴 хорошая / 中 хорошее' },
+  { id: 'b43', topic: '常用', ru: 'большой', stress: 'большо́й', pos: '形容词', cn: '大的', example: 'Это большой дом.', exampleCn: '这是大房子。', target: 'большой', note: '阴 большая' },
+  { id: 'b44', topic: '常用', ru: 'новый', stress: 'но́вый', pos: '形容词', cn: '新的', example: 'У меня новый телефон.', exampleCn: '我有新手机。', target: 'новый', note: '阴 новая' },
+  { id: 'b45', topic: '常用', ru: 'хорошо', stress: 'хорошо́', pos: '副词', cn: '好；好的', example: 'Всё хорошо.', exampleCn: '一切都好。', target: 'хорошо', note: '回答 как дела 的标准答案' },
+  { id: 'b46', topic: '常用', ru: 'плохо', stress: 'пло́хо', pos: '副词', cn: '不好；糟糕', example: 'Сегодня плохо.', exampleCn: '今天不好。', target: 'плохо', note: 'хорошо 的反义' },
+  { id: 'b47', topic: '常用', ru: 'да', stress: 'да́', pos: '语气词', cn: '是；对', example: 'Да, конечно!', exampleCn: '是的，当然！', target: 'Да', note: '肯定回答' },
+  { id: 'b48', topic: '常用', ru: 'нет', stress: 'не́т', pos: '语气词', cn: '不；没有', example: 'Нет, спасибо.', exampleCn: '不，谢谢。', target: 'Нет', note: '否定/婉拒' },
+  { id: 'b49', topic: '常用', ru: 'друг', stress: 'дру́г', pos: '阳性名词', cn: '朋友（男）', example: 'Он мой друг.', exampleCn: '他是我朋友。', target: 'друг', note: '复数：друзья' },
+  { id: 'b50', topic: '常用', ru: 'книга', stress: 'кни́га', pos: '阴性名词', cn: '书', example: 'Это новая книга.', exampleCn: '这是新书。', target: 'книга', note: '复数：книги' }
+];
+
+const TOPICS = ['全部', '问候', '家人', '数字', '食物', '动词', '地点', '常用'];
+const MODES = [
+  { id: 'browse', name: '浏览' },
+  { id: 'flashcard', name: '认词' },
+  { id: 'quiz', name: '选择题' },
+  { id: 'spell', name: '拼写' },
+  { id: 'cloze', name: '填空' },
+  { id: 'stats', name: '统计' },
+  { id: 'add', name: '＋添加' },
+  { id: 'mylist', name: '我的' }
+];
+
+const CYR_ROWS = [
+  ['й','ц','у','к','е','н','г','ш','щ','з','х','ъ'],
+  ['ф','ы','в','а','п','р','о','л','д','ж','э'],
+  ['я','ч','с','м','и','т','ь','б','ю','ё']
+];
+
+// ============ 图标 ============
+const ICON = {
+  volume: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  arrowLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>',
+  arrowRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>',
+  backspace: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM18 9l-6 6M12 9l6 6"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2v1.3h6V16.7c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>'
+};
+
+// ============ 状态 ============
+const STORE_KEY = 'russian_vocab_v3';
+let state = {
+  custom: [],
+  known: [],
+  stats: { browse: 0, flashcard: 0, quiz: 0, spell: 0, cloze: 0, correctSpell: 0, totalSpell: 0, correctCloze: 0, totalCloze: 0 }
+};
+let mode = 'browse';
+let topic = '全部';
+let idx = 0;
+let flashRevealed = false;
+let quizState = null;
+let spellState = null;
+let clozeState = null;
+let shifted = false;
+
+function loadState() {
+  try {
+    const s = localStorage.getItem(STORE_KEY);
+    if (s) {
+      const data = JSON.parse(s);
+      state.custom = data.custom || [];
+      state.known = data.known || [];
+      state.stats = Object.assign(state.stats, data.stats || {});
+    }
+  } catch(e) {}
+}
+function saveState() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+function isKnown(id) { return state.known.indexOf(id) >= 0; }
+function toggleKnown(id) {
+  const i = state.known.indexOf(id);
+  if (i >= 0) state.known.splice(i, 1); else state.known.push(id);
+  saveState();
+}
+function markKnown(id) {
+  if (state.known.indexOf(id) < 0) { state.known.push(id); saveState(); }
+}
+
+function getList() {
+  const all = BUILTIN.concat(state.custom);
+  if (topic === '全部') return all;
+  if (topic === '我添加的') return state.custom;
+  return all.filter(w => w.topic === topic);
+}
+
+// ============ 发音 ============
+function speak(text, rate) {
+  if (!('speechSynthesis' in window)) {
+    alert('当前浏览器不支持语音合成');
+    return;
+  }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ru-RU';
+  u.rate = rate || 0.85;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
+// ============ 渲染 ============
+const $ = (id) => document.getElementById(id);
+
+function renderTabs() {
+  $('modeTabs').innerHTML = MODES.map(m =>
+    `<button class="tab${mode === m.id ? ' active' : ''}" data-m="${m.id}">${m.name}</button>`
+  ).join('');
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => switchMode(b.dataset.m));
+}
+function renderTopics() {
+  const showTopics = ['browse', 'flashcard', 'quiz', 'spell', 'cloze'].indexOf(mode) >= 0;
+  $('topicRow').style.display = showTopics ? 'flex' : 'none';
+  if (!showTopics) return;
+  const all = TOPICS.concat(['我添加的']);
+  $('topicRow').innerHTML = all.map(t =>
+    `<button class="chip${topic === t ? ' active' : ''}" data-t="${t}">${t}</button>`
+  ).join('');
+  document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    topic = b.dataset.t;
+    idx = 0;
+    quizState = spellState = clozeState = null;
+    flashRevealed = false;
+    render();
+  });
+}
+function updateFooter() {
+  const list = getList();
+  if (list.length === 0) {
+    $('progressFill').style.width = '0%';
+    $('wordCounter').textContent = '0 / 0';
+  } else {
+    $('progressFill').style.width = ((idx + 1) / list.length * 100) + '%';
+    $('wordCounter').textContent = (idx + 1) + ' / ' + list.length;
+  }
+  $('knownCounter').textContent = state.known.length;
+}
+
+function empty(msg) {
+  return `<div class="card"><div class="empty">${msg}</div></div>`;
+}
+
+// ---- 浏览模式 ----
+function renderBrowse() {
+  const list = getList();
+  if (list.length === 0) { $('content').innerHTML = empty('这个分类还没有单词'); return; }
+  if (idx >= list.length) idx = 0;
+  const w = list[idx];
+
+  $('content').innerHTML = `
+    <div class="card">
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <span class="badge">${w.topic}</span>
+        ${w.custom ? '<span class="badge custom">自定义</span>' : ''}
+      </div>
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+        <span class="ru-big">${w.stress}</span>
+        <button class="icon-btn" id="speakWord">${ICON.volume}</button>
+        <button class="icon-btn" id="speakSlow">慢速</button>
+      </div>
+      <p class="pos" style="margin:0 0 12px;">${w.pos}</p>
+      <p class="cn" style="margin:0 0 4px;">${w.cn}</p>
+      ${w.example ? `<div class="example">
+        <div style="display:flex;justify-content:space-between;gap:8px;">
+          <p class="ru-ex">${w.example}</p>
+          <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button class="icon-btn" id="speakEx">${ICON.volume}</button>
+            <button class="icon-btn" id="speakExSlow">慢</button>
+          </div>
+        </div>
+        <p class="cn-ex">${w.exampleCn || ''}</p>
+      </div>` : ''}
+      ${w.note ? `<div class="note">${ICON.bulb} ${w.note}</div>` : ''}
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn" id="prev">${ICON.arrowLeft}</button>
+      <button class="nav-btn primary ${isKnown(w.id) ? 'success' : ''}" id="known">${ICON.check} ${isKnown(w.id) ? '已掌握' : '标记掌握'}</button>
+      <button class="nav-btn" id="next">${ICON.arrowRight}</button>
+    </div>
+  `;
+
+  $('speakWord').onclick = () => speak(w.ru);
+  $('speakSlow').onclick = () => speak(w.ru, 0.55);
+  if (w.example) {
+    $('speakEx').onclick = () => speak(w.example);
+    $('speakExSlow').onclick = () => speak(w.example, 0.55);
+  }
+  $('prev').onclick = () => { state.stats.browse++; saveState(); idx = (idx - 1 + list.length) % list.length; render(); };
+  $('next').onclick = () => { state.stats.browse++; saveState(); idx = (idx + 1) % list.length; render(); };
+  $('known').onclick = () => { toggleKnown(w.id); render(); };
+}
+
+// ---- 认词卡片 ----
+function renderFlashcard() {
+  const list = getList();
+  if (list.length === 0) { $('content').innerHTML = empty('这个分类还没有单词'); return; }
+  if (idx >= list.length) idx = 0;
+  const w = list[idx];
+
+  $('content').innerHTML = `
+    <div class="card flashcard" id="flashcard">
+      ${flashRevealed ? `
+        <p class="ru-mid" style="margin:0 0 4px;">${w.stress}</p>
+        <p class="pos" style="margin:0 0 14px;">${w.pos}</p>
+        <p class="cn" style="margin:0 0 12px;">${w.cn}</p>
+        ${w.example ? `<p style="font-family:var(--cyr);font-size:14px;color:var(--ink-soft);margin:0 0 14px;">${w.example}</p>` : ''}
+        <button class="icon-btn" id="speakFlash">${ICON.volume} 听</button>
+      ` : `
+        <p class="ru-big" style="margin:0 0 14px;">${w.stress}</p>
+        <p style="font-size:12px;color:var(--ink-faint);margin:0;">点击卡片查看释义</p>
+      `}
+    </div>
+    ${flashRevealed ? `<div class="nav-row">
+      <button class="nav-btn danger" id="forgot">${ICON.x} 不认识</button>
+      <button class="nav-btn success" id="got">${ICON.check} 认识</button>
+    </div>` : ''}
+  `;
+
+  $('flashcard').onclick = (e) => {
+    if (e.target.closest('#speakFlash')) return;
+    if (!flashRevealed) { flashRevealed = true; speak(w.ru); render(); }
+  };
+  if (flashRevealed) {
+    $('speakFlash').onclick = (e) => { e.stopPropagation(); speak(w.ru); };
+    $('got').onclick = () => {
+      markKnown(w.id);
+      state.stats.flashcard++;
+      saveState();
+      idx = (idx + 1) % list.length;
+      flashRevealed = false;
+      render();
+    };
+    $('forgot').onclick = () => {
+      const i = state.known.indexOf(w.id);
+      if (i >= 0) state.known.splice(i, 1);
+      state.stats.flashcard++;
+      saveState();
+      idx = (idx + 1) % list.length;
+      flashRevealed = false;
+      render();
+    };
+  }
+}
+
+// ---- 选择题 ----
+function renderQuiz() {
+  const list = getList();
+  if (list.length < 4) { $('content').innerHTML = empty('选择题需要至少 4 个单词'); return; }
+  if (idx >= list.length) idx = 0;
+  if (!quizState) {
+    const correct = list[idx];
+    const others = list.filter(x => x.id !== correct.id).sort(() => Math.random() - 0.5).slice(0, 3);
+    const options = others.concat([correct]).sort(() => Math.random() - 0.5);
+    quizState = { correct, options, answered: null };
+  }
+  const { correct, options, answered } = quizState;
+
+  $('content').innerHTML = `
+    <div class="card">
+      <p style="font-size:11px;color:var(--ink-faint);margin:0 0 6px;letter-spacing:0.05em;">这个词什么意思？</p>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+        <span class="ru-mid" style="font-size:28px;">${correct.stress}</span>
+        <button class="icon-btn" id="qSpeak">${ICON.volume}</button>
+      </div>
+      ${options.map((opt, i) => {
+        let cls = 'opt';
+        if (answered !== null) {
+          if (opt.id === correct.id) cls += ' correct';
+          else if (i === answered) cls += ' wrong';
+        }
+        return `<button class="${cls}" data-i="${i}" ${answered !== null ? 'disabled' : ''}>${opt.cn}</button>`;
+      }).join('')}
+      ${answered !== null && correct.example ? `<div class="example" style="margin-top:10px;">
+        <div style="display:flex;justify-content:space-between;gap:8px;">
+          <p class="ru-ex" style="font-weight:500;">${correct.example}</p>
+          <button class="icon-btn" id="qSpeakEx">${ICON.volume}</button>
+        </div>
+        <p class="cn-ex">${correct.exampleCn || ''}</p>
+      </div>` : ''}
+      ${answered !== null ? `<button class="nav-btn accent" style="width:100%;margin-top:10px;" id="qNext">下一题 ${ICON.arrowRight}</button>` : ''}
+    </div>
+  `;
+
+  $('qSpeak').onclick = () => speak(correct.ru);
+  if (answered === null) {
+    document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+      const i = parseInt(b.dataset.i);
+      quizState.answered = i;
+      state.stats.quiz++;
+      if (options[i].id === correct.id) markKnown(correct.id);
+      saveState();
+      render();
+    });
+  } else {
+    if (correct.example) $('qSpeakEx').onclick = () => speak(correct.example);
+    $('qNext').onclick = () => { idx = (idx + 1) % list.length; quizState = null; render(); };
+  }
+}
+
+// ---- 拼写 ----
+function renderKeyboard(handler) {
+  return `<div class="kbd">
+    ${CYR_ROWS.map(row => `<div class="kbd-row">${row.map(ch =>
+      `<button class="kbd-key" data-ch="${ch}">${shifted ? ch.toUpperCase() : ch}</button>`
+    ).join('')}</div>`).join('')}
+    <div class="kbd-row" style="margin-top:5px;">
+      <button class="kbd-key kbd-fn ${shifted ? 'active' : ''}" id="kShift" style="flex:1;max-width:50px;">⇧</button>
+      <button class="kbd-key kbd-fn" id="kSpace" style="flex:3;max-width:none;">空格</button>
+      <button class="kbd-key kbd-fn" id="kBs" style="flex:1;max-width:50px;">${ICON.backspace}</button>
+    </div>
+  </div>`;
+}
+
+function bindKeyboard(onChar, onSpace, onBs) {
+  document.querySelectorAll('.kbd-key[data-ch]').forEach(b => b.onclick = () => {
+    const ch = shifted ? b.dataset.ch.toUpperCase() : b.dataset.ch;
+    onChar(ch);
+  });
+  $('kShift').onclick = () => { shifted = !shifted; render(); };
+  $('kSpace').onclick = onSpace;
+  $('kBs').onclick = onBs;
+}
+
+function renderSpell() {
+  const list = getList();
+  if (list.length === 0) { $('content').innerHTML = empty('这个分类还没有单词'); return; }
+  if (idx >= list.length) idx = 0;
+  if (!spellState) spellState = { word: list[idx], input: '', checked: false };
+  const w = spellState.word;
+  const correct = w.ru.toLowerCase();
+  const userInput = spellState.input.toLowerCase();
+  const isOk = userInput === correct;
+
+  $('content').innerHTML = `
+    <div class="card">
+      <p style="font-size:11px;color:var(--ink-faint);margin:0 0 4px;letter-spacing:0.05em;">把这个词拼出来</p>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <span style="font-size:20px;font-weight:500;">${w.cn}</span>
+        <span class="pos">${w.pos}</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button class="icon-btn" id="spSp">${ICON.volume} 听</button>
+        <button class="icon-btn" id="spSpSlow">慢速</button>
+      </div>
+      <div class="input-display ${spellState.checked ? (isOk ? 'ok' : 'err') : ''} ${spellState.input ? '' : 'empty'}">
+        ${spellState.input || '点字母拼写'}
+      </div>
+      ${spellState.checked ? `<div class="feedback ${isOk ? 'ok' : 'err'}">
+        ${isOk ? `${ICON.check} 正确！` : `${ICON.x} 正确答案：<strong>${w.stress}</strong>`}
+      </div>` : ''}
+      ${renderKeyboard()}
+      <div class="nav-row">
+        ${!spellState.checked ? `<button class="nav-btn accent primary" id="spCheck">检查</button>` : ''}
+        <button class="nav-btn" id="spNext">${spellState.checked ? '下一个 →' : '跳过'}</button>
+      </div>
+    </div>
+  `;
+
+  $('spSp').onclick = () => speak(w.ru);
+  $('spSpSlow').onclick = () => speak(w.ru, 0.55);
+  bindKeyboard(
+    (ch) => { if (!spellState.checked) { spellState.input += ch; render(); } },
+    () => { if (!spellState.checked) { spellState.input += ' '; render(); } },
+    () => { if (!spellState.checked) { spellState.input = spellState.input.slice(0, -1); render(); } }
+  );
+  if (!spellState.checked) {
+    $('spCheck').onclick = () => {
+      spellState.checked = true;
+      state.stats.spell++;
+      state.stats.totalSpell++;
+      if (isOk) { state.stats.correctSpell++; markKnown(w.id); }
+      saveState();
+      render();
+    };
+  }
+  $('spNext').onclick = () => {
+    idx = (idx + 1) % list.length;
+    spellState = null;
+    shifted = false;
+    render();
+  };
+}
+
+// ---- 填空 ----
+function renderCloze() {
+  const list = getList().filter(w => w.example && w.target);
+  if (list.length === 0) { $('content').innerHTML = empty('这个分类暂无可填空的例句'); return; }
+  if (idx >= list.length) idx = 0;
+  if (!clozeState) clozeState = { word: list[idx], input: '', checked: false };
+  const w = clozeState.word;
+  const correct = w.target.toLowerCase();
+  const userInput = clozeState.input.toLowerCase();
+  const isOk = userInput === correct;
+  const masked = w.example.replace(new RegExp(w.target, 'i'), '_____');
+
+  $('content').innerHTML = `
+    <div class="card">
+      <p style="font-size:11px;color:var(--ink-faint);margin:0 0 6px;letter-spacing:0.05em;">补全句子里缺失的词</p>
+      <p style="font-family:var(--cyr);font-size:19px;margin:0 0 6px;line-height:1.5;">${masked}</p>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">${w.exampleCn || ''}</p>
+      <div class="note" style="margin-bottom:10px;">${ICON.bulb} 提示：${w.cn}</div>
+      <div class="input-display ${clozeState.checked ? (isOk ? 'ok' : 'err') : ''} ${clozeState.input ? '' : 'empty'}">
+        ${clozeState.input || '点字母填空'}
+      </div>
+      ${clozeState.checked ? `<div class="feedback ${isOk ? 'ok' : 'err'}">
+        ${isOk ? `${ICON.check} 正确！完整句子：<strong>${w.example}</strong>` : `${ICON.x} 正确答案：<strong>${w.target}</strong>`}
+        <button class="icon-btn" id="czPlay" style="margin-left:auto;">${ICON.volume} 听</button>
+      </div>` : ''}
+      ${renderKeyboard()}
+      <div class="nav-row">
+        ${!clozeState.checked ? `<button class="nav-btn accent primary" id="czCheck">检查</button>` : ''}
+        <button class="nav-btn" id="czNext">${clozeState.checked ? '下一题 →' : '跳过'}</button>
+      </div>
+    </div>
+  `;
+
+  bindKeyboard(
+    (ch) => { if (!clozeState.checked) { clozeState.input += ch; render(); } },
+    () => { if (!clozeState.checked) { clozeState.input += ' '; render(); } },
+    () => { if (!clozeState.checked) { clozeState.input = clozeState.input.slice(0, -1); render(); } }
+  );
+  if (!clozeState.checked) {
+    $('czCheck').onclick = () => {
+      clozeState.checked = true;
+      state.stats.cloze++;
+      state.stats.totalCloze++;
+      if (isOk) { state.stats.correctCloze++; markKnown(w.id); }
+      saveState();
+      render();
+    };
+  } else {
+    $('czPlay').onclick = () => speak(w.example);
+  }
+  $('czNext').onclick = () => {
+    idx = (idx + 1) % list.length;
+    clozeState = null;
+    shifted = false;
+    render();
+  };
+}
+
+// ---- 统计 ----
+function renderStats() {
+  const total = BUILTIN.length + state.custom.length;
+  const knownPct = total > 0 ? Math.round(state.known.length / total * 100) : 0;
+  const totalActions = state.stats.browse + state.stats.flashcard + state.stats.quiz + state.stats.spell + state.stats.cloze;
+  const spellAcc = state.stats.totalSpell > 0 ? Math.round(state.stats.correctSpell / state.stats.totalSpell * 100) : 0;
+  const clozeAcc = state.stats.totalCloze > 0 ? Math.round(state.stats.correctCloze / state.stats.totalCloze * 100) : 0;
+  const topicStats = TOPICS.slice(1).map(t => {
+    const inTopic = BUILTIN.filter(w => w.topic === t);
+    const knownInTopic = inTopic.filter(w => isKnown(w.id)).length;
+    return { topic: t, total: inTopic.length, known: knownInTopic };
+  });
+
+  $('content').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card"><p class="stat-label">总词数</p><p class="stat-value">${total}</p></div>
+      <div class="stat-card"><p class="stat-label">已掌握</p><p class="stat-value">${state.known.length} <span class="stat-sub">${knownPct}%</span></p></div>
+      <div class="stat-card"><p class="stat-label">拼写正确率</p><p class="stat-value">${spellAcc}<span style="font-size:14px;">%</span> <span class="stat-sub">${state.stats.correctSpell}/${state.stats.totalSpell}</span></p></div>
+      <div class="stat-card"><p class="stat-label">填空正确率</p><p class="stat-value">${clozeAcc}<span style="font-size:14px;">%</span> <span class="stat-sub">${state.stats.correctCloze}/${state.stats.totalCloze}</span></p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:10px;">
+      <p style="font-size:12px;font-weight:500;margin:0 0 12px;letter-spacing:0.05em;">各主题掌握进度</p>
+      ${topicStats.map(s => `<div class="topic-bar">
+        <div class="lbl"><span>${s.topic}</span><span>${s.known} / ${s.total}</span></div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${s.total > 0 ? s.known / s.total * 100 : 0}%;"></div></div>
+      </div>`).join('')}
+    </div>
+
+    <div class="card" style="margin-bottom:10px;">
+      <p style="font-size:12px;font-weight:500;margin:0 0 10px;letter-spacing:0.05em;">练习次数（累计 ${totalActions}）</p>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;text-align:center;">
+        <div><p style="font-family:var(--serif);font-size:20px;margin:0;font-weight:500;">${state.stats.browse}</p><p class="stat-label" style="margin-top:2px;">浏览</p></div>
+        <div><p style="font-family:var(--serif);font-size:20px;margin:0;font-weight:500;">${state.stats.flashcard}</p><p class="stat-label" style="margin-top:2px;">认词</p></div>
+        <div><p style="font-family:var(--serif);font-size:20px;margin:0;font-weight:500;">${state.stats.quiz}</p><p class="stat-label" style="margin-top:2px;">选择</p></div>
+        <div><p style="font-family:var(--serif);font-size:20px;margin:0;font-weight:500;">${state.stats.spell}</p><p class="stat-label" style="margin-top:2px;">拼写</p></div>
+        <div><p style="font-family:var(--serif);font-size:20px;margin:0;font-weight:500;">${state.stats.cloze}</p><p class="stat-label" style="margin-top:2px;">填空</p></div>
+      </div>
+    </div>
+
+    <button class="nav-btn" id="resetBtn" style="width:100%;color:var(--err);">重置所有进度</button>
+  `;
+  $('resetBtn').onclick = () => {
+    if (confirm('确认要清除所有学习进度吗？自定义单词不会被删除。')) {
+      state.known = [];
+      state.stats = { browse: 0, flashcard: 0, quiz: 0, spell: 0, cloze: 0, correctSpell: 0, totalSpell: 0, correctCloze: 0, totalCloze: 0 };
+      saveState();
+      render();
+    }
+  };
+}
+
+// ---- 添加 ----
+function renderAdd() {
+  $('content').innerHTML = `
+    <div class="card">
+      <p style="font-size:14px;font-weight:500;margin:0 0 12px;">添加新单词</p>
+      <div class="form-row"><label class="form-label">俄语 *</label><input id="inRu" placeholder="例如：книга"></div>
+      <div class="form-row"><label class="form-label">带重音（可选，重音字母后加 ́ ）</label><input id="inStress" placeholder="例如：кни́га"></div>
+      <div class="form-row"><label class="form-label">中文 *</label><input id="inCn" placeholder="例如：书"></div>
+      <div class="form-row"><label class="form-label">词性</label><input id="inPos" placeholder="例如：阴性名词"></div>
+      <div class="form-row"><label class="form-label">例句</label><input id="inEx" placeholder="例如：Это новая книга."></div>
+      <div class="form-row"><label class="form-label">例句中文</label><input id="inExCn" placeholder="例如：这是一本新书。"></div>
+      <div class="form-row"><label class="form-label">备注</label><input id="inNote" placeholder="变格、用法等"></div>
+      <div class="nav-row">
+        <button class="nav-btn success primary" id="saveBtn">${ICON.check} 保存</button>
+        <button class="nav-btn" id="clearBtn">清空</button>
+      </div>
+      <p id="addMsg" style="font-size:11px;margin:10px 0 0;min-height:14px;"></p>
+    </div>
+  `;
+  $('saveBtn').onclick = () => {
+    const ru = $('inRu').value.trim();
+    const cn = $('inCn').value.trim();
+    if (!ru || !cn) {
+      $('addMsg').style.color = 'var(--err)';
+      $('addMsg').textContent = '请填写俄语和中文';
+      return;
+    }
+    state.custom.push({
+      id: 'c' + Date.now(),
+      topic: '我添加的',
+      ru,
+      stress: $('inStress').value.trim() || ru,
+      cn,
+      pos: $('inPos').value.trim() || '自定义',
+      example: $('inEx').value.trim(),
+      exampleCn: $('inExCn').value.trim(),
+      target: ru,
+      note: $('inNote').value.trim(),
+      custom: true
+    });
+    saveState();
+    $('addMsg').style.color = 'var(--ok)';
+    $('addMsg').textContent = '✓ 已添加';
+    ['inRu','inStress','inCn','inPos','inEx','inExCn','inNote'].forEach(id => $(id).value = '');
+    updateFooter();
+  };
+  $('clearBtn').onclick = () => {
+    ['inRu','inStress','inCn','inPos','inEx','inExCn','inNote'].forEach(id => $(id).value = '');
+    $('addMsg').textContent = '';
+  };
+}
+
+// ---- 我的词 ----
+function renderMyList() {
+  if (state.custom.length === 0) {
+    $('content').innerHTML = `<div class="card" style="text-align:center;padding:30px 20px;">
+      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;">还没添加单词</p>
+      <button class="nav-btn" id="gotoAdd" style="display:inline-block;padding:8px 16px;">＋ 去添加</button>
+    </div>`;
+    $('gotoAdd').onclick = () => switchMode('add');
+    return;
+  }
+  $('content').innerHTML = `<div class="card">
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;">共 ${state.custom.length} 个自定义</p>
+    ${state.custom.map(w => `<div class="list-item">
+      <div class="info">
+        <p class="ru">${w.stress}</p>
+        <p class="cn-small">${w.cn}</p>
+      </div>
+      <button class="small-btn" data-sp="${w.ru}">${ICON.volume}</button>
+      <button class="small-btn danger" data-del="${w.id}">${ICON.trash}</button>
+    </div>`).join('')}
+  </div>`;
+  document.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => speak(b.dataset.sp));
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    state.custom = state.custom.filter(x => x.id !== b.dataset.del);
+    saveState();
+    render();
+  });
+}
+
+function render() {
+  renderTabs();
+  renderTopics();
+  $('progressBar').style.display = ['stats','add','mylist'].indexOf(mode) >= 0 ? 'none' : 'block';
+  updateFooter();
+  switch(mode) {
+    case 'browse': renderBrowse(); break;
+    case 'flashcard': renderFlashcard(); break;
+    case 'quiz': renderQuiz(); break;
+    case 'spell': renderSpell(); break;
+    case 'cloze': renderCloze(); break;
+    case 'stats': renderStats(); break;
+    case 'add': renderAdd(); break;
+    case 'mylist': renderMyList(); break;
+  }
+}
+function switchMode(m) {
+  mode = m;
+  flashRevealed = false;
+  quizState = spellState = clozeState = null;
+  shifted = false;
+  render();
+}
+
+// 启动
+loadState();
+render();
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
